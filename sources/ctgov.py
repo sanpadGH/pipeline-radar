@@ -123,7 +123,7 @@ def fetch_phase3_recent(days_back: int = 7, page_size: int = 100, max_pages: int
             # be gentle with rate limits
             time.sleep(sleep_s)
 
-            event_id = _hash_id("ctgov", nct, last_update)
+            event_id = _hash_id("ctgov", nct)
 
             events.append({
                 "event_id": event_id,
