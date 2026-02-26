@@ -1,17 +1,19 @@
 name: pipeline-radar
 
-on:
+"on":
   workflow_dispatch:
   schedule:
-    - cron: "0 7 * * 1"  # placeholder, lo cambiamos luego
+    - cron: "0 7 * * 1"
 
 jobs:
   run:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -24,4 +26,4 @@ jobs:
           SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
           WORKSHEET_NAME: events
           DAYS_BACK: "7"
-        run: python tracker.py
+        run: python3 tracker.py
