@@ -25,5 +25,5 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
           WORKSHEET_NAME: events
-          DAYS_BACK: "7"
+          DAYS_BACK: "90"
         run: python3 tracker.py
