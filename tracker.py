@@ -1,6 +1,7 @@
 import os
 from sources.ctgov import fetch_phase3_recent
 from sources.ema_chmp_under_eval import fetch_ema_under_review_chmp
+from sources.ctis import fetch_ctis_phase3
 from sinks.sheets import upsert_events
 
 def main():
@@ -16,6 +17,9 @@ def main():
 
     ema_events = fetch_ema_under_review_chmp()
     print("EMA CHMP under evaluation fetched:", len(ema_events))
+
+    ctis_events = fetch_ctis_phase3()
+    print("CTIS fetched:", len(ctis_events))
 
     inserted = upsert_events(spreadsheet_id, worksheet, ctgov_events + ema_events)
     print("Inserted rows:", inserted)
