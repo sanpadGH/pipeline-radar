@@ -2,3 +2,6 @@ requests
 gspread
 google-auth
 python-dateutil
+beautifulsoup4
+pandas
+openpyxl
