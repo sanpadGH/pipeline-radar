@@ -28,11 +28,19 @@ def upsert_events(spreadsheet_id, worksheet_name, events):
 
     existing = ws.get_all_records()
     existing_ids = {r["event_id"] for r in existing if r.get("event_id")}
+    existing_trial_ids = {r["trial_id"] for r in existing if r.get("trial_id")}
 
     new_rows = []
     for e in events:
-        if e["event_id"] not in existing_ids:
-            new_rows.append([e.get(col, "") for col in COLUMNS])
+
+    # deduplicación por trial_id (CTIS vs CT.gov)
+    if e.get("trial_id") in existing_trial_ids:
+        continue
+
+    if e["event_id"] in existing_ids:
+        continue
+
+    new_rows.append([e.get(col, "") for col in COLUMNS])
 
     if new_rows:
         ws.append_rows(new_rows)
