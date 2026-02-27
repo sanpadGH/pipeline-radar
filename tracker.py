@@ -1,5 +1,6 @@
 import os
 from sources.ctgov import fetch_phase3_recent
+from sources.ema import fetch_ema_under_review
 from sinks.sheets import upsert_events
 
 def main():
@@ -8,13 +9,19 @@ def main():
     days_back = int(os.environ.get("DAYS_BACK", "7"))
 
     print("Running tracker...")
-    print("Days back:", days_back)
+    print("Days back (CTGOV):", days_back)
 
-    events = fetch_phase3_recent(days_back=days_back)
+    # ---- CTGOV ----
+    ctgov_events = fetch_phase3_recent(days_back=days_back)
+    print("CTGOV fetched:", len(ctgov_events))
 
-    print("Fetched events:", len(events))
+    # ---- EMA ----
+    ema_events = fetch_ema_under_review()
+    print("EMA fetched:", len(ema_events))
 
-    inserted = upsert_events(spreadsheet_id, worksheet, events)
+    all_events = ctgov_events + ema_events
+
+    inserted = upsert_events(spreadsheet_id, worksheet, all_events)
 
     print("Inserted rows:", inserted)
 
