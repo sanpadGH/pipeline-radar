@@ -21,7 +21,8 @@ def main():
     ctis_events = fetch_ctis_phase3()
     print("CTIS fetched:", len(ctis_events))
 
-    inserted = upsert_events(spreadsheet_id, worksheet, ctgov_events + ema_events)
+    all_events = ctgov_events + ema_events + ctis_events
+    inserted = upsert_events(spreadsheet_id, worksheet, all_events)
     print("Inserted rows:", inserted)
 
 if __name__ == "__main__":
