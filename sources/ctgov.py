@@ -64,6 +64,9 @@ def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: in
             conds = _safe_get(ps, ["conditionsModule", "conditions"], default=[]) or []
             interventions = _safe_get(ps, ["armsInterventionsModule", "interventions"], default=[]) or []
             asset_name = interventions[0].get("name", "") if interventions else ""
+            locations = _safe_get(ps, ["contactsLocationsModule", "locations"], default=[]) or []
+            countries = list({loc.get("country", "") for loc in locations if loc.get("country")})
+            geography = ", ".join(sorted(countries)) if countries else ""
             overall = _safe_get(ps, ["statusModule", "overallStatus"])
 
             event_id = _hash_id("ctgov", nct, last_update)
@@ -80,7 +83,7 @@ def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: in
                 "trial_id": nct,
                 "start_date": _safe_get(ps, ["statusModule", "startDateStruct", "date"]),
                 "last_update": last_update,
-                "geography": "",
+                "geography": geography,
                 "source_url": f"https://clinicaltrials.gov/study/{nct}",
                 "title": title,
                 "summary": f"Status: {overall}",
