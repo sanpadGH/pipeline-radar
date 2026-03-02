@@ -20,31 +20,27 @@ def _client():
         scopes=SCOPES
     )
     return gspread.authorize(creds)
-
 def upsert_events(spreadsheet_id, worksheet_name, events):
-
     gc = _client()
     ws = gc.open_by_key(spreadsheet_id).worksheet(worksheet_name)
 
     existing = ws.get_all_records()
+
+    if not existing and ws.row_count < 2:
+        ws.append_row(COLUMNS, value_input_option="RAW")
+
     existing_ids = {r["event_id"] for r in existing if r.get("event_id")}
     existing_trial_ids = {r["trial_id"] for r in existing if r.get("trial_id")}
 
     new_rows = []
-
     for e in events:
-
-        # deduplicación por trial_id (CTIS vs CT.gov)
         if e.get("trial_id") in existing_trial_ids:
             continue
-
-        # deduplicación por event_id
         if e["event_id"] in existing_ids:
             continue
-
         new_rows.append([e.get(col, "") for col in COLUMNS])
 
     if new_rows:
-        ws.append_rows(new_rows)
+        ws.append_rows(new_rows, value_input_option="RAW")
 
     return len(new_rows)
