@@ -24,10 +24,10 @@ def upsert_events(spreadsheet_id, worksheet_name, events):
     gc = _client()
     ws = gc.open_by_key(spreadsheet_id).worksheet(worksheet_name)
 
-    existing = ws.get_all_records()
+    # Siempre forzar header correcto en fila 1
+    ws.update("A1", [COLUMNS])
 
-    if not existing and ws.row_count < 2:
-        ws.append_row(COLUMNS, value_input_option="RAW")
+    existing = ws.get_all_records(expected_headers=COLUMNS)
 
     existing_ids = {r["event_id"] for r in existing if r.get("event_id")}
     existing_trial_ids = {r["trial_id"] for r in existing if r.get("trial_id")}
