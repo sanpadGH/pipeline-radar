@@ -62,6 +62,8 @@ def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: in
             title = _safe_get(ps, ["identificationModule", "briefTitle"])
             sponsor = _safe_get(ps, ["sponsorCollaboratorsModule", "leadSponsor", "name"])
             conds = _safe_get(ps, ["conditionsModule", "conditions"], default=[]) or []
+            interventions = _safe_get(ps, ["armsInterventionsModule", "interventions"], default=[]) or []
+            asset_name = interventions[0].get("name", "") if interventions else ""
             overall = _safe_get(ps, ["statusModule", "overallStatus"])
 
             event_id = _hash_id("ctgov", nct, last_update)
@@ -71,7 +73,7 @@ def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: in
                 "date_detected": now.isoformat(),
                 "source": "ctgov",
                 "signal_type": "phase3_trial",
-                "asset_name": "",
+                "asset_name": asset_name,
                 "company": sponsor,
                 "indication_raw": ", ".join(conds),
                 "phase": "3",
