@@ -1,61 +1,85 @@
-import requests
 import hashlib
+import json
+import requests
 from datetime import datetime, timezone
 
-CTIS_SEARCH_URL = "https://euclinicaltrials.eu/ctis-public-api/search"
+OVERVIEW_URL = "https://euclinicaltrials.eu/ctis-public-api/search"
 
 def _hash_id(*parts):
-    return hashlib.sha256("||".join([p or "" for p in parts]).encode()).hexdigest()[:20]
+    return hashlib.sha256("||".join([p or "" for p in parts]).encode("utf-8")).hexdigest()[:20]
 
-def fetch_ctis_phase3():
-
+def fetch_ctis_phase3(page_size: int = 200, max_pages: int = 10):
     now = datetime.now(timezone.utc)
 
-    payload = {
-        "query": "*",
-        "filters": {
-            "trialPhase": ["Phase 3"]
-        },
-        "size": 100
-    }
-
-    r = requests.post(CTIS_SEARCH_URL, json=payload, timeout=60)
-    r.raise_for_status()
-    data = r.json()
-
     events = []
+    page = 1
+    next_page = True
 
-    for t in data.get("hits", []):
+    while next_page and page <= max_pages:
+        payload = {
+            "pagination": {"page": page, "size": page_size},
+            "sort": {"property": "decisionDate", "direction": "DESC"},
+            "searchCriteria": {
+                "containAll": None,
+                "containAny": None,
+                "containNot": None,
+                "title": None,
+                "number": None,
+                "status": None,
+                "medicalCondition": None,
+                "sponsor": None,
+                "endPoint": None,
+                "productName": None,
+                "trialPhaseCode": None,
+                "eudraCtCode": None,
+                "trialRegion": None,
+            },
+        }
 
-        eudract = t.get("eudractNumber", "")
-        title = t.get("title", "")
-        sponsor = t.get("sponsorName", "")
-        condition = t.get("medicalCondition", "")
-        nct = t.get("nctNumber", "")
+        r = requests.post(
+            OVERVIEW_URL,
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(payload),
+            timeout=60
+        )
+        r.raise_for_status()
+        data = r.json()
 
-        trial_key = eudract or nct
+        for t in data.get("data", []):
+            trial_phase = (t.get("trialPhase") or "").lower()
+            if "phase iii" not in trial_phase and "phase 3" not in trial_phase:
+                continue
 
-        if not trial_key:
-            continue
+            ct_number = (t.get("ctNumber") or "").strip()
+            title = (t.get("ctTitle") or "").strip()
+            sponsor = (t.get("sponsor") or "").strip()
+            condition = (t.get("conditions") or "").strip()
+            last_updated = (t.get("lastUpdated") or "").strip()
 
-        event_id = _hash_id("ctis", trial_key)
+            if not ct_number:
+                continue
 
-        events.append({
-            "event_id": event_id,
-            "date_detected": now.isoformat(),
-            "source": "ctis",
-            "signal_type": "phase3_trial",
-            "asset_name": "",
-            "company": sponsor,
-            "indication_raw": condition,
-            "phase": "3",
-            "trial_id": trial_key,
-            "start_date": "",
-            "last_update": "",
-            "geography": "EU",
-            "source_url": "",
-            "title": title,
-            "summary": f"EudraCT: {eudract} NCT: {nct}",
-        })
+            event_id = _hash_id("ctis", ct_number)
+
+            events.append({
+                "event_id": event_id,
+                "date_detected": now.isoformat(),
+                "source": "ctis",
+                "signal_type": "phase3_trial",
+                "asset_name": "",
+                "company": sponsor,
+                "indication_raw": condition,
+                "phase": "3",
+                "trial_id": ct_number,
+                "start_date": "",
+                "last_update": last_updated,
+                "geography": "EU",
+                "source_url": f"https://euclinicaltrials.eu/ctis-public/search/{ct_number}",
+                "title": title,
+                "summary": f"trialPhase={t.get('trialPhase','')}; decisionDate={t.get('decisionDateOverall','')}",
+            })
+
+        next_page = data.get("pagination", {}).get("nextPage", False)
+        page += 1
 
     return events
