@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 
 EMA_UNDER_EVAL_PAGE = "https://www.ema.europa.eu/en/medicines/medicines-human-use-under-evaluation"
-EPAR_URL = "https://www.ema.europa.eu/sites/default/files/Medicines_output_european_public_assessment_reports.xlsx"
+EPAR_URL = "https://www.ema.europa.eu/system/files/documents/other/medicines_output_european_public_assessment_reports_en.xlsx"
 
 def _hash_id(*parts: str) -> str:
     return hashlib.sha256("||".join([p or "" for p in parts]).encode("utf-8")).hexdigest()[:20]
