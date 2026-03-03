@@ -16,7 +16,7 @@ def _safe_get(dct, path, default=""):
 def _hash_id(*parts: str) -> str:
     return hashlib.sha256("||".join([p or "" for p in parts]).encode("utf-8")).hexdigest()[:20]
 
-def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: int = 20):
+def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: int = 50):
     now = datetime.now(timezone.utc)
 
     params = {
