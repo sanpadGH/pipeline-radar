@@ -1,6 +1,6 @@
 import os
 from sources.ctgov import fetch_phase3_recent
-from sources.ema_chmp import fetch_ema_under_review_chmp
+from sources.ema_chmp_under_eval import fetch_ema_under_review_chmp
 from sources.ctis import fetch_ctis_phase3
 from sources.fda import fetch_fda_under_review
 from sinks.sheets import upsert_events
