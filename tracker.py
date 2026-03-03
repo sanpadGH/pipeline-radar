@@ -1,13 +1,14 @@
 import os
 from sources.ctgov import fetch_phase3_recent
-from sources.ema_chmp_under_eval import fetch_ema_under_review_chmp
+from sources.ema_chmp import fetch_ema_under_review_chmp
 from sources.ctis import fetch_ctis_phase3
+from sources.fda import fetch_fda_under_review
 from sinks.sheets import upsert_events
 
 def main():
     spreadsheet_id = os.environ["SPREADSHEET_ID"]
     worksheet = os.environ.get("WORKSHEET_NAME", "events")
-    days_back = int(os.environ.get("DAYS_BACK", "7"))
+    days_back = int(os.environ.get("DAYS_BACK", "90"))
 
     print("Running tracker...")
     print("Days back (CTGOV):", days_back)
@@ -21,7 +22,10 @@ def main():
     ctis_events = fetch_ctis_phase3()
     print("CTIS fetched:", len(ctis_events))
 
-    all_events = ctgov_events + ema_events + ctis_events
+    fda_events = fetch_fda_under_review()
+
+    all_events = ema_events + fda_events + ctis_events + ctgov_events
+
     inserted = upsert_events(spreadsheet_id, worksheet, all_events)
     print("Inserted rows:", inserted)
 
