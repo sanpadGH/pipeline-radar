@@ -25,6 +25,8 @@ def _latest_under_eval_xlsx_url() -> str:
 def _build_sponsor_lookup() -> dict:
     try:
         df = pd.read_excel(EPAR_URL, header=8)
+        print("EPAR columns:", list(df.columns)[:5])
+        print("EPAR shape:", df.shape)
         lookup = {}
         for _, row in df.iterrows():
             inn = str(row.get("International non-proprietary name (INN) / common name", "") or "").strip().lower()
