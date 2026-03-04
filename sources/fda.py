@@ -56,11 +56,13 @@ def fetch_fda_approvals():
 
                     sponsor = record.get("sponsor_name", "").strip()
                     products = record.get("products", []) or []
-                    drug_name = ""
+                    brand_name = ""
+                    generic_name = ""
                     if products:
-                        drug_name = products[0].get("brand_name", "") or products[0].get("generic_name", "")
+                        brand_name = products[0].get("brand_name", "").strip()
+                        generic_name = products[0].get("generic_name", "").strip()
 
-                    # Keep only most recent relevant submission
+                    # Keep only most recent ORIG submission
                     best_sub = None
                     for sub in record.get("submissions", []) or []:
                         sub_status = sub.get("submission_status", "").strip()
@@ -69,7 +71,7 @@ def fetch_fda_approvals():
 
                         if sub_status != "AP":
                             continue
-                        if sub_type not in ("ORIG", "SUPPL"):
+                        if sub_type != "ORIG":
                             continue
                         if action_date and action_date < cutoff:
                             continue
@@ -83,7 +85,6 @@ def fetch_fda_approvals():
                     sub_no = best_sub.get("submission_number", "").strip()
                     action_date = best_sub.get("submission_status_date", "").strip()
 
-                    # Format date YYYYMMDD -> YYYY-MM-DD
                     if len(action_date) == 8:
                         action_date = f"{action_date[:4]}-{action_date[4:6]}-{action_date[6:]}"
 
@@ -94,7 +95,7 @@ def fetch_fda_approvals():
                         "date_detected": now.isoformat(),
                         "source": "fda",
                         "signal_type": "fda_approval",
-                        "asset_name": drug_name,
+                        "asset_name": generic_name or brand_name,
                         "company": sponsor,
                         "indication_raw": "",
                         "phase": "",
@@ -103,8 +104,8 @@ def fetch_fda_approvals():
                         "last_update": action_date,
                         "geography": "US",
                         "source_url": f"https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm?event=overview.process&ApplNo={app_no.replace('NDA','').replace('BLA','')}",
-                        "title": drug_name,
-                        "summary": f"{app_no}/{sub_no}; Status: AP; Date: {action_date}",
+                        "title": brand_name or generic_name,
+                        "summary": f"{app_no}/{sub_no}; Brand: {brand_name}; INN: {generic_name}; Status: AP; Date: {action_date}",
                     })
 
     print(f"FDA approvals fetched: {len(events)}")
@@ -116,28 +117,28 @@ def fetch_fda_adcom():
     events = []
 
     try:
-        r = requests.get(FDA_ADCOM_URL, timeout=60)
+        url = (
+            "https://www.federalregister.gov/api/v1/documents.json"
+            "?conditions[agencies][]=food-and-drug-administration"
+            "&conditions[term]=advisory+committee"
+            "&conditions[type][]=Notice"
+            "&per_page=40"
+            "&order=newest"
+        )
+        r = requests.get(url, timeout=30)
         r.raise_for_status()
-        soup = BeautifulSoup(r.text, "html.parser")
+        data = r.json()
 
-        # AdCom calendar is in a table
-        for row in soup.select("table tbody tr"):
-            cols = [c.get_text(strip=True) for c in row.find_all("td")]
-            if len(cols) < 3:
+        for doc in data.get("results", []):
+            title = doc.get("title", "").strip()
+            pub_date = doc.get("publication_date", "").strip()
+            doc_url = doc.get("html_url", "").strip()
+            abstract = doc.get("abstract", "").strip()
+
+            if not title:
                 continue
 
-            date_str = cols[0]
-            committee = cols[1] if len(cols) > 1 else ""
-            topic = cols[2] if len(cols) > 2 else ""
-            link_tag = row.find("a", href=True)
-            url = link_tag["href"] if link_tag else FDA_ADCOM_URL
-            if url.startswith("/"):
-                url = "https://www.fda.gov" + url
-
-            if not date_str or not topic:
-                continue
-
-            event_id = _hash_id("fda_adcom", date_str, topic[:50])
+            event_id = _hash_id("fda_adcom", doc.get("document_number", title[:40]))
 
             events.append({
                 "event_id": event_id,
@@ -149,16 +150,16 @@ def fetch_fda_adcom():
                 "indication_raw": "",
                 "phase": "",
                 "trial_id": "",
-                "start_date": date_str,
-                "last_update": "",
+                "start_date": pub_date,
+                "last_update": pub_date,
                 "geography": "US",
-                "source_url": url,
-                "title": topic,
-                "summary": f"Committee: {committee}; Date: {date_str}",
+                "source_url": doc_url,
+                "title": title,
+                "summary": abstract[:300] if abstract else "",
             })
 
     except Exception as ex:
-        print(f"Warning: FDA AdCom scraping failed: {ex}")
+        print(f"Warning: FDA AdCom Federal Register fetch failed: {ex}")
 
     print(f"FDA AdCom fetched: {len(events)}")
     return events
