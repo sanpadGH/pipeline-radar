@@ -51,6 +51,11 @@ def fetch_fda_approvals():
                     appl_type = app_no[:3]
                     if appl_type not in ("NDA", "BLA"):
                         continue
+                    if appl_type == "BLA" and not events:
+                        subs = record.get("submissions", []) or []
+                        if subs:
+                            print("BLA submission sample:", json.dumps(subs[0], indent=2))
+                            break   
 
                     sponsor = record.get("sponsor_name", "").strip()
                     products = record.get("products", []) or []
