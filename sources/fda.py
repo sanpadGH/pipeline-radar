@@ -5,15 +5,40 @@ import zipfile
 import io
 import json
 from datetime import datetime, timezone, timedelta
+from bs4 import BeautifulSoup
 
 FDA_DOWNLOAD_URL = "https://api.fda.gov/download.json"
+FDA_BIOSIMILARS_PAGE = "https://www.fda.gov/drugs/biosimilars/biosimilar-product-information"
 
 def _hash_id(*parts):
     return hashlib.sha256("||".join([p or "" for p in parts]).encode("utf-8")).hexdigest()[:20]
 
+def _load_fda_biosimilar_proper_names() -> set:
+    try:
+        r = requests.get(FDA_BIOSIMILARS_PAGE, timeout=30)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+        bios = set()
+        for row in soup.select("table tr"):
+            cols = [c.get_text(" ", strip=True) for c in row.find_all(["td", "th"])]
+            if not cols:
+                continue
+            m = re.search(r"\(([^)]+)\)", cols[0])
+            if m:
+                proper = m.group(1).strip().lower()
+                if proper and len(proper) > 5:
+                    bios.add(proper)
+        return bios
+    except Exception as ex:
+        print(f"Warning: could not load FDA biosimilars list: {ex}")
+        return set()
+
 def fetch_fda_approvals():
     now = datetime.now(timezone.utc)
     cutoff = f"{now.year - 1}0101"
+
+    biosimilar_names = _load_fda_biosimilar_proper_names()
+    print(f"Loaded FDA biosimilars list: {len(biosimilar_names)}")
 
     r = requests.get(FDA_DOWNLOAD_URL, timeout=30)
     r.raise_for_status()
@@ -61,8 +86,8 @@ def fetch_fda_approvals():
                         brand_name = products[0].get("brand_name", "").strip()
                         generic_name = products[0].get("generic_name", "").strip()
 
-                    # Excluir biosimilares por sufijo de 4 letras en generic_name
-                    if re.search(r'-[a-z]{4}$', generic_name.lower()):
+                    # Excluir biosimilares usando lista oficial FDA
+                    if generic_name and generic_name.strip().lower() in biosimilar_names:
                         continue
 
                     best_sub = None
