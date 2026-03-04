@@ -1,6 +1,5 @@
 import hashlib
 import pandas as pd
-import requests
 from datetime import datetime, timezone
 
 EPAR_URL = "https://www.ema.europa.eu/system/files/documents/other/medicines_output_european_public_assessment_reports_en.xlsx"
@@ -19,9 +18,12 @@ def fetch_ema_approvals():
         return []
 
     print("EPAR shape:", df.shape)
-    print("EPAR columns:", list(df.columns)[:10])
+    print("ALL EPAR columns:", list(df.columns))
     print("Authorisation status values:", df["Authorisation status"].value_counts().head() if "Authorisation status" in df.columns else "COLUMN NOT FOUND")
     print("Sample auth dates:", df["Marketing authorisation date"].dropna().head() if "Marketing authorisation date" in df.columns else "COLUMN NOT FOUND")
+
+    sample = df[df["Authorisation status"] == "Authorised"].iloc[0]
+    print("Sample row:", sample.to_dict())
 
     events = []
 
