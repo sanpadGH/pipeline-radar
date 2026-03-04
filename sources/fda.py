@@ -4,7 +4,6 @@ import zipfile
 import io
 import json
 from datetime import datetime, timezone, timedelta
-from bs4 import BeautifulSoup
 
 FDA_DOWNLOAD_URL = "https://api.fda.gov/download.json"
 
@@ -31,7 +30,6 @@ def fetch_fda_approvals():
         return []
 
     events = []
-    bla_sample_printed = False
 
     for partition in partitions:
         url = partition.get("file")
@@ -62,14 +60,13 @@ def fetch_fda_approvals():
                         brand_name = products[0].get("brand_name", "").strip()
                         generic_name = products[0].get("generic_name", "").strip()
 
-                    # Debug: print BLA structure once
-                    if appl_type == "BLA" and not bla_sample_printed and products:
-                        print("BLA sample products:", json.dumps(products[:1], indent=2))
-                        bla_sample_printed = True
-
-                    # Keep only most recent ORIG submission within cutoff
                     best_sub = None
                     for sub in record.get("submissions", []) or []:
+                        # Excluir biosimilares y genericos
+                        sub_class = sub.get("submission_class_code_description", "").lower()
+                        if "biosimilar" in sub_class or "generic" in sub_class or "351(k)" in sub_class:
+                            continue
+
                         sub_status = sub.get("submission_status", "").strip()
                         sub_type = sub.get("submission_type", "").strip()
                         action_date = sub.get("submission_status_date", "").strip()
