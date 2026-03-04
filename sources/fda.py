@@ -5,40 +5,25 @@ import zipfile
 import io
 import json
 from datetime import datetime, timezone, timedelta
-from bs4 import BeautifulSoup
 
 FDA_DOWNLOAD_URL = "https://api.fda.gov/download.json"
-FDA_BIOSIMILARS_PAGE = "https://www.fda.gov/drugs/biosimilars/biosimilar-product-information"
+
+# BLA numbers de biosimilares conocidos — actualizar periódicamente
+BIOSIMILAR_BLA = {
+    "BLA761377", "BLA761398", "BLA761399", "BLA761188", "BLA761340",
+    "BLA761433", "BLA761444", "BLA761424", "BLA761420", "BLA761498",
+    "BLA761338", "BLA761439", "BLA761449", "BLA761406", "BLA761419",
+    "BLA761425", "BLA761373", "BLA761392", "BLA761436", "BLA761404",
+    "BLA761379", "BLA761212", "BLA761325", "BLA761175", "BLA761027",
+    "BLA761456", "BLA761457", "BLA761473", "BLA761258",
+}
 
 def _hash_id(*parts):
     return hashlib.sha256("||".join([p or "" for p in parts]).encode("utf-8")).hexdigest()[:20]
 
-def _load_fda_biosimilar_proper_names() -> set:
-    try:
-        r = requests.get(FDA_BIOSIMILARS_PAGE, timeout=30)
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, "html.parser")
-        bios = set()
-        for row in soup.select("table tr"):
-            cols = [c.get_text(" ", strip=True) for c in row.find_all(["td", "th"])]
-            if not cols:
-                continue
-            m = re.search(r"\(([^)]+)\)", cols[0])
-            if m:
-                proper = m.group(1).strip().lower()
-                if proper and len(proper) > 5:
-                    bios.add(proper)
-        return bios
-    except Exception as ex:
-        print(f"Warning: could not load FDA biosimilars list: {ex}")
-        return set()
-
 def fetch_fda_approvals():
     now = datetime.now(timezone.utc)
     cutoff = f"{now.year - 1}0101"
-
-    biosimilar_names = _load_fda_biosimilar_proper_names()
-    print(f"Loaded FDA biosimilars list: {len(biosimilar_names)}")
 
     r = requests.get(FDA_DOWNLOAD_URL, timeout=30)
     r.raise_for_status()
@@ -78,6 +63,10 @@ def fetch_fda_approvals():
                     if appl_type not in ("NDA", "BLA"):
                         continue
 
+                    # Excluir biosimilares conocidos
+                    if app_no in BIOSIMILAR_BLA:
+                        continue
+
                     sponsor = record.get("sponsor_name", "").strip()
                     products = record.get("products", []) or []
                     brand_name = ""
@@ -85,10 +74,6 @@ def fetch_fda_approvals():
                     if products:
                         brand_name = products[0].get("brand_name", "").strip()
                         generic_name = products[0].get("generic_name", "").strip()
-
-                    # Excluir biosimilares usando lista oficial FDA
-                    if generic_name and generic_name.strip().lower() in biosimilar_names:
-                        continue
 
                     best_sub = None
                     for sub in record.get("submissions", []) or []:
