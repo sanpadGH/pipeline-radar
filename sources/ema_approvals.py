@@ -18,6 +18,11 @@ def fetch_ema_approvals():
         print(f"Warning: could not load EPAR dataset: {ex}")
         return []
 
+    print("EPAR shape:", df.shape)
+    print("EPAR columns:", list(df.columns)[:10])
+    print("Authorisation status values:", df["Authorisation status"].value_counts().head() if "Authorisation status" in df.columns else "COLUMN NOT FOUND")
+    print("Sample auth dates:", df["Marketing authorisation date"].dropna().head() if "Marketing authorisation date" in df.columns else "COLUMN NOT FOUND")
+
     events = []
 
     for _, row in df.iterrows():
@@ -25,8 +30,6 @@ def fetch_ema_approvals():
         if status.lower() != "authorised":
             continue
 
-        # Filter generics and biosimilars
-        category = str(row.get("Category", "") or "").strip().lower()
         generic = str(row.get("Generic", "") or "").strip().lower()
         biosimilar = str(row.get("Biosimilar", "") or "").strip().lower()
         if generic == "yes" or biosimilar == "yes":
