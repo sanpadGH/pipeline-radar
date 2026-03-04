@@ -3,7 +3,7 @@ import requests
 import zipfile
 import io
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 FDA_DOWNLOAD_URL = "https://api.fda.gov/download.json"
 
@@ -12,13 +12,12 @@ def _hash_id(*parts):
 
 def fetch_fda_under_review():
     now = datetime.now(timezone.utc)
+    cutoff = (now - timedelta(days=365*3)).strftime("%Y%m%d")
 
-    # Get download manifest
     r = requests.get(FDA_DOWNLOAD_URL, timeout=30)
     r.raise_for_status()
     manifest = r.json()
 
-    # Find drugsfda partitions
     partitions = (
         manifest.get("results", {})
         .get("drug", {})
@@ -48,53 +47,62 @@ def fetch_fda_under_review():
                     data = json.load(f)
 
                 for record in data.get("results", []):
-                    appl_type = record.get("application_number", "")[:3]
+                    app_no = record.get("application_number", "").strip()
+                    appl_type = app_no[:3]
                     if appl_type not in ("NDA", "BLA"):
                         continue
 
-                    app_no = record.get("application_number", "").strip()
                     sponsor = record.get("sponsor_name", "").strip()
-
                     products = record.get("products", []) or []
-                    drug_name = products[0].get("brand_name", "") if products else ""
-                    if not drug_name:
-                        drug_name = products[0].get("generic_name", "") if products else ""
+                    drug_name = ""
+                    if products:
+                        drug_name = products[0].get("brand_name", "") or products[0].get("generic_name", "")
 
+                    # Keep only best (most recent) relevant submission
+                    best_sub = None
                     for sub in record.get("submissions", []) or []:
                         sub_status = sub.get("submission_status", "").strip()
                         sub_type = sub.get("submission_type", "").strip()
-                        sub_no = sub.get("submission_number", "").strip()
                         action_date = sub.get("submission_status_date", "").strip()
 
-                        if sub_status == "Filed":
-                            signal_type = "fda_under_review"
-                        elif sub_status == "AP":
-                            signal_type = "fda_approval"
-                        else:
+                        if sub_status not in ("Filed", "AP"):
                             continue
-
                         if sub_type not in ("ORIG", "SUPPL"):
                             continue
+                        if sub_status == "AP" and action_date and action_date < cutoff:
+                            continue
 
-                        event_id = _hash_id("fda", app_no, sub_no, sub_status)
+                        if best_sub is None or action_date > best_sub.get("submission_status_date", ""):
+                            best_sub = sub
 
-                        events.append({
-                            "event_id": event_id,
-                            "date_detected": now.isoformat(),
-                            "source": "fda",
-                            "signal_type": signal_type,
-                            "asset_name": drug_name,
-                            "company": sponsor,
-                            "indication_raw": "",
-                            "phase": "",
-                            "trial_id": app_no,
-                            "start_date": "",
-                            "last_update": action_date,
-                            "geography": "US",
-                            "source_url": f"https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm?event=overview.process&ApplNo={app_no.replace('NDA','').replace('BLA','')}",
-                            "title": drug_name,
-                            "summary": f"{app_no}/{sub_no}; Status: {sub_status}; Date: {action_date}",
-                        })
+                    if best_sub is None:
+                        continue
+
+                    sub_status = best_sub.get("submission_status", "").strip()
+                    sub_no = best_sub.get("submission_number", "").strip()
+                    action_date = best_sub.get("submission_status_date", "").strip()
+
+                    signal_type = "fda_under_review" if sub_status == "Filed" else "fda_approval"
+
+                    event_id = _hash_id("fda", app_no, sub_no, sub_status)
+
+                    events.append({
+                        "event_id": event_id,
+                        "date_detected": now.isoformat(),
+                        "source": "fda",
+                        "signal_type": signal_type,
+                        "asset_name": drug_name,
+                        "company": sponsor,
+                        "indication_raw": "",
+                        "phase": "",
+                        "trial_id": app_no,
+                        "start_date": "",
+                        "last_update": action_date,
+                        "geography": "US",
+                        "source_url": f"https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm?event=overview.process&ApplNo={app_no.replace('NDA','').replace('BLA','')}",
+                        "title": drug_name,
+                        "summary": f"{app_no}/{sub_no}; Status: {sub_status}; Date: {action_date}",
+                    })
 
     print(f"FDA fetched: {len(events)}")
     return events
