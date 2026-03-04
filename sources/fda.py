@@ -1,4 +1,5 @@
 import hashlib
+import re
 import requests
 import zipfile
 import io
@@ -52,14 +53,6 @@ def fetch_fda_approvals():
                     if appl_type not in ("NDA", "BLA"):
                         continue
 
-                    # Excluir biosimilares (351k pathway)
-                    is_biosimilar = any(
-                        "351(k)" in (s.get("submission_class_code", "") or "")
-                        for s in record.get("submissions", []) or []
-                    )
-                    if is_biosimilar:
-                        continue
-
                     sponsor = record.get("sponsor_name", "").strip()
                     products = record.get("products", []) or []
                     brand_name = ""
@@ -67,6 +60,10 @@ def fetch_fda_approvals():
                     if products:
                         brand_name = products[0].get("brand_name", "").strip()
                         generic_name = products[0].get("generic_name", "").strip()
+
+                    # Excluir biosimilares por sufijo de 4 letras en generic_name
+                    if re.search(r'-[a-z]{4}$', generic_name.lower()):
+                        continue
 
                     best_sub = None
                     for sub in record.get("submissions", []) or []:
