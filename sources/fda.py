@@ -7,14 +7,13 @@ from datetime import datetime, timezone, timedelta
 from bs4 import BeautifulSoup
 
 FDA_DOWNLOAD_URL = "https://api.fda.gov/download.json"
-FDA_ADCOM_URL = "https://www.fda.gov/advisory-committees/advisory-committee-calendar"
 
 def _hash_id(*parts):
     return hashlib.sha256("||".join([p or "" for p in parts]).encode("utf-8")).hexdigest()[:20]
 
 def fetch_fda_approvals():
     now = datetime.now(timezone.utc)
-    cutoff = (now - timedelta(days=365)).strftime("%Y%m%d")
+    cutoff = f"{now.year - 1}0101"
 
     r = requests.get(FDA_DOWNLOAD_URL, timeout=30)
     r.raise_for_status()
@@ -32,6 +31,7 @@ def fetch_fda_approvals():
         return []
 
     events = []
+    bla_sample_printed = False
 
     for partition in partitions:
         url = partition.get("file")
@@ -62,7 +62,12 @@ def fetch_fda_approvals():
                         brand_name = products[0].get("brand_name", "").strip()
                         generic_name = products[0].get("generic_name", "").strip()
 
-                    # Keep only most recent ORIG submission
+                    # Debug: print BLA structure once
+                    if appl_type == "BLA" and not bla_sample_printed and products:
+                        print("BLA sample products:", json.dumps(products[:1], indent=2))
+                        bla_sample_printed = True
+
+                    # Keep only most recent ORIG submission within cutoff
                     best_sub = None
                     for sub in record.get("submissions", []) or []:
                         sub_status = sub.get("submission_status", "").strip()
