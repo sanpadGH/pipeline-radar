@@ -51,11 +51,6 @@ def fetch_fda_approvals():
                     appl_type = app_no[:3]
                     if appl_type not in ("NDA", "BLA"):
                         continue
-                    if appl_type == "BLA" and not events:
-                        subs = record.get("submissions", []) or []
-                        if subs:
-                            print("BLA submission sample:", json.dumps(subs[0], indent=2))
-                            break   
 
                     sponsor = record.get("sponsor_name", "").strip()
                     products = record.get("products", []) or []
@@ -67,9 +62,8 @@ def fetch_fda_approvals():
 
                     best_sub = None
                     for sub in record.get("submissions", []) or []:
-                        # Excluir biosimilares y genericos
                         sub_class = sub.get("submission_class_code_description", "").lower()
-                        if "biosimilar" in sub_class or "generic" in sub_class or "351(k)" in sub_class:
+                        if any(x in sub_class for x in ("biosimilar", "generic", "abbreviated")):
                             continue
 
                         sub_status = sub.get("submission_status", "").strip()
