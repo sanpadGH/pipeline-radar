@@ -10,9 +10,38 @@ FDA_DOWNLOAD_URL = "https://api.fda.gov/download.json"
 def _hash_id(*parts):
     return hashlib.sha256("||".join([p or "" for p in parts]).encode("utf-8")).hexdigest()[:20]
 
+def _load_biosimilar_apps() -> set:
+    biosimilar_apps = set()
+    try:
+        # Purple Book via openFDA — marketing_status Biosimilar
+        skip = 0
+        limit = 100
+        while True:
+            r = requests.get(
+                f"https://api.fda.gov/drug/drugsfda.json"
+                f"?search=products.marketing_status:\"Biosimilar\"&limit={limit}&skip={skip}",
+                timeout=30
+            )
+            if r.status_code != 200:
+                break
+            data = r.json()
+            results = data.get("results", [])
+            for rec in results:
+                biosimilar_apps.add(rec.get("application_number", "").strip())
+            if len(results) < limit:
+                break
+            skip += limit
+    except Exception as ex:
+        print(f"Warning: Purple Book lookup failed: {ex}")
+    print(f"Biosimilar apps to exclude: {len(biosimilar_apps)}")
+    return biosimilar_apps
+
+
 def fetch_fda_approvals():
     now = datetime.now(timezone.utc)
     cutoff = f"{now.year - 1}0101"
+
+    biosimilar_apps = _load_biosimilar_apps()
 
     r = requests.get(FDA_DOWNLOAD_URL, timeout=30)
     r.raise_for_status()
@@ -52,6 +81,10 @@ def fetch_fda_approvals():
                     if appl_type not in ("NDA", "BLA"):
                         continue
 
+                    # Excluir biosimilares
+                    if app_no in biosimilar_apps:
+                        continue
+
                     sponsor = record.get("sponsor_name", "").strip()
                     products = record.get("products", []) or []
                     brand_name = ""
@@ -62,10 +95,6 @@ def fetch_fda_approvals():
 
                     best_sub = None
                     for sub in record.get("submissions", []) or []:
-                        sub_class = sub.get("submission_class_code_description", "").lower()
-                        if any(x in sub_class for x in ("biosimilar", "generic", "abbreviated")):
-                            continue
-
                         sub_status = sub.get("submission_status", "").strip()
                         sub_type = sub.get("submission_type", "").strip()
                         action_date = sub.get("submission_status_date", "").strip()
