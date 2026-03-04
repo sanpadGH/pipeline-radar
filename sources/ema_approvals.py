@@ -17,44 +17,33 @@ def fetch_ema_approvals():
         print(f"Warning: could not load EPAR dataset: {ex}")
         return []
 
-    print("EPAR shape:", df.shape)
-    print("ALL EPAR columns:", list(df.columns))
-    print("Authorisation status values:", df["Authorisation status"].value_counts().head() if "Authorisation status" in df.columns else "COLUMN NOT FOUND")
-    print("Sample auth dates:", df["Marketing authorisation date"].dropna().head() if "Marketing authorisation date" in df.columns else "COLUMN NOT FOUND")
+    # Filter authorised only
+    df = df[df["Authorisation status"] == "Authorised"]
 
-    sample = df[df["Authorisation status"] == "Authorised"].iloc[0]
-    print("Sample row:", sample.to_dict())
+    # Filter humans only
+    df = df[df["Category"] == "Human"]
+
+    # Filter generics and biosimilars
+    df = df[df["Generic"].str.lower() != "yes"]
+    df = df[df["Biosimilar"].str.lower() != "yes"]
+
+    # Filter by Decision date >= cutoff
+    df = df.dropna(subset=["Decision date"])
+    df["_decision_year"] = pd.to_datetime(df["Decision date"], errors="coerce").dt.year
+    df = df[df["_decision_year"] >= cutoff_year]
+
+    print(f"EMA approvals after filters: {len(df)}")
+    if len(df) > 0:
+        print("Sample filtered:", df[["Medicine name", "Decision date", "Generic", "Biosimilar"]].head(5).to_string())
 
     events = []
 
     for _, row in df.iterrows():
-        status = str(row.get("Authorisation status", "") or "").strip()
-        if status.lower() != "authorised":
+        decision_date = pd.to_datetime(row.get("Decision date"), errors="coerce")
+        if pd.isna(decision_date):
             continue
 
-        generic = str(row.get("Generic", "") or "").strip().lower()
-        biosimilar = str(row.get("Biosimilar", "") or "").strip().lower()
-        if generic == "yes" or biosimilar == "yes":
-            continue
-
-        auth_date = row.get("Marketing authorisation date", None)
-        if auth_date is None:
-            continue
-
-        try:
-            if hasattr(auth_date, 'year'):
-                auth_year = auth_date.year
-                auth_date_str = auth_date.strftime("%Y-%m-%d")
-            else:
-                import dateutil.parser
-                parsed = dateutil.parser.parse(str(auth_date))
-                auth_year = parsed.year
-                auth_date_str = parsed.strftime("%Y-%m-%d")
-        except Exception:
-            continue
-
-        if auth_year < cutoff_year:
-            continue
+        auth_date_str = decision_date.strftime("%Y-%m-%d")
 
         inn = str(row.get("International non-proprietary name (INN) / common name", "") or "").strip()
         medicine_name = str(row.get("Medicine name", "") or "").strip()
@@ -85,7 +74,7 @@ def fetch_ema_approvals():
             "geography": "EU",
             "source_url": url,
             "title": medicine_name,
-            "summary": f"Auth date: {auth_date_str}; TA: {therapeutic_area}; Orphan: {orphan}",
+            "summary": f"Decision date: {auth_date_str}; TA: {therapeutic_area}; Orphan: {orphan}",
         })
 
     print(f"EMA approvals fetched: {len(events)}")
