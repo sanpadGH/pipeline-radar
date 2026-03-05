@@ -22,15 +22,15 @@ def fetch_ema_approvals():
     df = df[df["Generic"].str.strip().str.lower() != "yes"]
     df = df[df["Biosimilar"].str.strip().str.lower() != "yes"]
 
-    df["_ec_date"] = pd.to_datetime(df["European Commission decision date"], dayfirst=True, errors="coerce")
-    df = df.dropna(subset=["_ec_date"])
-    df = df[df["_ec_date"].dt.year >= cutoff_year]
+    df["_auth_date"] = pd.to_datetime(df["Marketing authorisation date"], dayfirst=True, errors="coerce")
+    df = df.dropna(subset=["_auth_date"])
+    df = df[df["_auth_date"].dt.year >= cutoff_year]
 
     events = []
 
     for _, row in df.iterrows():
-        ec_date = row["_ec_date"]
-        auth_date_str = ec_date.strftime("%Y-%m-%d")
+        auth_date = row["_auth_date"]
+        auth_date_str = auth_date.strftime("%Y-%m-%d")
 
         inn = str(row.get("International non-proprietary name (INN) / common name", "") or "").strip()
         medicine_name = str(row.get("Name of medicine", "") or "").strip()
@@ -61,7 +61,7 @@ def fetch_ema_approvals():
             "geography": "EU",
             "source_url": url,
             "title": medicine_name,
-            "summary": f"EC decision: {auth_date_str}; TA: {therapeutic_area}; Orphan: {orphan}",
+            "summary": f"Auth date: {auth_date_str}; TA: {therapeutic_area}; Orphan: {orphan}",
         })
 
     print(f"EMA approvals fetched: {len(events)}")
