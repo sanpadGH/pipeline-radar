@@ -1,6 +1,5 @@
 import hashlib
 from datetime import datetime, timezone, timedelta
-from dateutil.parser import isoparse
 import requests
 
 CTGOV_API = "https://clinicaltrials.gov/api/v2/studies"
@@ -16,13 +15,19 @@ def _safe_get(dct, path, default=""):
 def _hash_id(*parts: str) -> str:
     return hashlib.sha256("||".join([p or "" for p in parts]).encode("utf-8")).hexdigest()[:20]
 
-def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: int = 20):
+def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: int = 10):
     now = datetime.now(timezone.utc)
     completion_min = now.strftime("%Y-%m-%d")
-    completion_max = (now + timedelta(days=24 * 30)).strftime("%Y-%m-%d")
+    completion_max = (now + timedelta(days=12 * 30)).strftime("%Y-%m-%d")
 
     params = {
-        "query.term": f"AREA[Phase]PHASE3 AND AREA[PrimaryCompletionDate]RANGE[{completion_min},{completion_max}]",
+        "query.term": (
+            f"AREA[Phase]PHASE3 "
+            f"AND AREA[PrimaryCompletionDate]RANGE[{completion_min},{completion_max}] "
+            f"AND (AREA[InterventionType]DRUG OR AREA[InterventionType]BIOLOGICAL)"
+        ),
+        "filter.overallStatus": "RECRUITING,ACTIVE_NOT_RECRUITING",
+        "filter.advanced": "AREA[LeadSponsorClass]INDUSTRY",
         "pageSize": page_size,
         "format": "json",
         "sort": "PrimaryCompletionDate:asc",
@@ -50,7 +55,8 @@ def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: in
             sponsor = _safe_get(ps, ["sponsorCollaboratorsModule", "leadSponsor", "name"])
             conds = _safe_get(ps, ["conditionsModule", "conditions"], default=[]) or []
             interventions = _safe_get(ps, ["armsInterventionsModule", "interventions"], default=[]) or []
-            asset_name = interventions[0].get("name", "") if interventions else ""
+            drug_interventions = [i for i in interventions if i.get("type") in ("DRUG", "BIOLOGICAL")]
+            asset_name = drug_interventions[0].get("name", "") if drug_interventions else ""
             locations = _safe_get(ps, ["contactsLocationsModule", "locations"], default=[]) or []
             countries = list({loc.get("country", "") for loc in locations if loc.get("country")})
             geography = ", ".join(sorted(countries)) if countries else ""

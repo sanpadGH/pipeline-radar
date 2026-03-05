@@ -15,7 +15,6 @@ def main():
     print("Days back (CTGOV):", days_back)
 
     ctgov_events = fetch_phase3_recent(days_back=days_back)
-    print("CTGOV fetched:", len(ctgov_events))
 
     ema_events = fetch_ema_under_review_chmp()
     print("EMA CHMP under evaluation fetched:", len(ema_events))
@@ -26,9 +25,9 @@ def main():
     fda_events = fetch_fda_under_review()
 
     ema_approval_events = fetch_ema_approvals()
-    
+
     all_events = ema_events + ema_approval_events + fda_events + ctis_events + ctgov_events
-    
+
     inserted = upsert_events(spreadsheet_id, worksheet, all_events)
     print("Inserted rows:", inserted)
 
