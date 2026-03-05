@@ -1,5 +1,5 @@
 import hashlib
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from dateutil.parser import isoparse
 import requests
 
@@ -18,20 +18,22 @@ def _hash_id(*parts: str) -> str:
 
 def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: int = 20):
     now = datetime.now(timezone.utc)
+    completion_cutoff_max = (now + timedelta(days=24 * 30)).strftime("%Y-%m-%d")
+    completion_cutoff_min = now.strftime("%Y-%m-%d")
 
     params = {
         "query.term": "AREA[Phase]PHASE3",
+        "filter.advanced": f"AREA[PrimaryCompletionDate]RANGE[{completion_cutoff_min},{completion_cutoff_max}]",
         "pageSize": page_size,
         "format": "json",
-        "sort": "LastUpdatePostDate:desc",
+        "sort": "PrimaryCompletionDate:asc",
     }
 
     events = []
     next_page_token = None
     pages = 0
-    stop_early = False
 
-    while pages < max_pages and not stop_early:
+    while pages < max_pages:
         if next_page_token:
             params["pageToken"] = next_page_token
         elif "pageToken" in params:
@@ -44,20 +46,6 @@ def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: in
         for s in data.get("studies", []):
             ps = s.get("protocolSection", {})
 
-            last_update = _safe_get(ps, ["statusModule", "lastUpdatePostDateStruct", "date"])
-
-            if not last_update:
-                continue
-
-            try:
-                lu = isoparse(last_update).date()
-                delta = (now.date() - lu).days
-                if delta > days_back:
-                    stop_early = True
-                    break
-            except Exception:
-                continue
-
             nct = _safe_get(ps, ["identificationModule", "nctId"])
             title = _safe_get(ps, ["identificationModule", "briefTitle"])
             sponsor = _safe_get(ps, ["sponsorCollaboratorsModule", "leadSponsor", "name"])
@@ -68,8 +56,10 @@ def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: in
             countries = list({loc.get("country", "") for loc in locations if loc.get("country")})
             geography = ", ".join(sorted(countries)) if countries else ""
             overall = _safe_get(ps, ["statusModule", "overallStatus"])
+            last_update = _safe_get(ps, ["statusModule", "lastUpdatePostDateStruct", "date"])
+            primary_completion = _safe_get(ps, ["statusModule", "primaryCompletionDateStruct", "date"])
 
-            event_id = _hash_id("ctgov", nct, last_update)
+            event_id = _hash_id("ctgov", nct, primary_completion)
 
             events.append({
                 "event_id": event_id,
@@ -86,7 +76,7 @@ def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: in
                 "geography": geography,
                 "source_url": f"https://clinicaltrials.gov/study/{nct}",
                 "title": title,
-                "summary": f"Status: {overall}",
+                "summary": f"Status: {overall}; Primary completion: {primary_completion}",
             })
 
         next_page_token = data.get("nextPageToken")
@@ -94,4 +84,5 @@ def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: in
         if not next_page_token:
             break
 
+    print(f"CTGOV fetched: {len(events)}")
     return events
