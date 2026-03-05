@@ -23,6 +23,9 @@ def fetch_ema_approvals():
     # Filter humans only
     df = df[df["Category"] == "Human"]
 
+    print("Max Decision date:", pd.to_datetime(df["Decision date"], errors="coerce").max())
+    print("Max Marketing auth date:", pd.to_datetime(df["Marketing authorisation date"], errors="coerce").max())
+
     # Filter generics and biosimilars
     df = df[df["Generic"].str.lower() != "yes"]
     df = df[df["Biosimilar"].str.lower() != "yes"]
