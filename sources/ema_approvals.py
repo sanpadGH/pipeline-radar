@@ -17,32 +17,29 @@ def fetch_ema_approvals():
         print(f"Warning: could not load EMA approvals dataset: {ex}")
         return []
 
-    df = df[df["Authorisation status"] == "Authorised"]
     df = df[df["Category"] == "Human"]
-    df = df[df["Generic"].str.lower() != "yes"]
-    df = df[df["Biosimilar"].str.lower() != "yes"]
+    df = df[df["Medicine status"] == "Authorised"]
+    df = df[df["Generic"].str.strip().str.lower() != "yes"]
+    df = df[df["Biosimilar"].str.strip().str.lower() != "yes"]
 
-    df = df.dropna(subset=["Decision date"])
-    df["_decision_year"] = pd.to_datetime(df["Decision date"], errors="coerce").dt.year
-    df = df[df["_decision_year"] >= cutoff_year]
+    df["_ec_date"] = pd.to_datetime(df["European Commission decision date"], dayfirst=True, errors="coerce")
+    df = df.dropna(subset=["_ec_date"])
+    df = df[df["_ec_date"].dt.year >= cutoff_year]
 
     events = []
 
     for _, row in df.iterrows():
-        decision_date = pd.to_datetime(row.get("Decision date"), errors="coerce")
-        if pd.isna(decision_date):
-            continue
-
-        auth_date_str = decision_date.strftime("%Y-%m-%d")
+        ec_date = row["_ec_date"]
+        auth_date_str = ec_date.strftime("%Y-%m-%d")
 
         inn = str(row.get("International non-proprietary name (INN) / common name", "") or "").strip()
-        medicine_name = str(row.get("Medicine name", "") or "").strip()
-        company = str(row.get("Marketing authorisation holder/company name", "") or "").strip()
-        indication = str(row.get("Condition / indication", "") or "").strip()
-        product_number = str(row.get("Product number", "") or "").strip()
-        therapeutic_area = str(row.get("Human pharmacotherapeutic group", "") or "").strip()
+        medicine_name = str(row.get("Name of medicine", "") or "").strip()
+        company = str(row.get("Marketing authorisation developer / applicant / holder", "") or "").strip()
+        indication = str(row.get("Therapeutic indication", "") or "").strip()
+        product_number = str(row.get("EMA product number", "") or "").strip()
+        therapeutic_area = str(row.get("Pharmacotherapeutic group\n(human)", "") or "").strip()
         orphan = str(row.get("Orphan medicine", "") or "").strip()
-        url = str(row.get("URL", "") or "").strip()
+        url = str(row.get("Medicine URL", "") or "").strip()
 
         if not inn and not medicine_name:
             continue
@@ -64,7 +61,7 @@ def fetch_ema_approvals():
             "geography": "EU",
             "source_url": url,
             "title": medicine_name,
-            "summary": f"Decision date: {auth_date_str}; TA: {therapeutic_area}; Orphan: {orphan}",
+            "summary": f"EC decision: {auth_date_str}; TA: {therapeutic_area}; Orphan: {orphan}",
         })
 
     print(f"EMA approvals fetched: {len(events)}")
