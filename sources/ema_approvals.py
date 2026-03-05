@@ -2,7 +2,7 @@ import hashlib
 import pandas as pd
 from datetime import datetime, timezone
 
-EPAR_URL = "https://www.ema.europa.eu/system/files/documents/other/medicines_output_european_public_assessment_reports_en.xlsx"
+EPAR_URL = "https://www.ema.europa.eu/en/documents/report/medicines-output-medicines-report_en.xlsx"
 
 def _hash_id(*parts):
     return hashlib.sha256("||".join([p or "" for p in parts]).encode("utf-8")).hexdigest()[:20]
@@ -14,30 +14,17 @@ def fetch_ema_approvals():
     try:
         df = pd.read_excel(EPAR_URL, header=8)
     except Exception as ex:
-        print(f"Warning: could not load EPAR dataset: {ex}")
+        print(f"Warning: could not load EMA approvals dataset: {ex}")
         return []
 
-    # Filter authorised only
     df = df[df["Authorisation status"] == "Authorised"]
-
-    # Filter humans only
     df = df[df["Category"] == "Human"]
-
-    print("Max Decision date:", pd.to_datetime(df["Decision date"], errors="coerce").max())
-    print("Max Marketing auth date:", pd.to_datetime(df["Marketing authorisation date"], errors="coerce").max())
-
-    # Filter generics and biosimilars
     df = df[df["Generic"].str.lower() != "yes"]
     df = df[df["Biosimilar"].str.lower() != "yes"]
 
-    # Filter by Decision date >= cutoff
     df = df.dropna(subset=["Decision date"])
     df["_decision_year"] = pd.to_datetime(df["Decision date"], errors="coerce").dt.year
     df = df[df["_decision_year"] >= cutoff_year]
-
-    print(f"EMA approvals after filters: {len(df)}")
-    if len(df) > 0:
-        print("Sample filtered:", df[["Medicine name", "Decision date", "Generic", "Biosimilar"]].head(5).to_string())
 
     events = []
 
