@@ -18,12 +18,11 @@ def _hash_id(*parts: str) -> str:
 
 def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: int = 20):
     now = datetime.now(timezone.utc)
-    completion_cutoff_max = (now + timedelta(days=24 * 30)).strftime("%Y-%m-%d")
-    completion_cutoff_min = now.strftime("%Y-%m-%d")
+    completion_min = now.strftime("%Y-%m-%d")
+    completion_max = (now + timedelta(days=24 * 30)).strftime("%Y-%m-%d")
 
     params = {
-        "query.term": "AREA[Phase]PHASE3",
-        "filter.advanced": f"AREA[PrimaryCompletionDate]RANGE[{completion_cutoff_min},{completion_cutoff_max}]",
+        "query.term": f"AREA[Phase]PHASE3 AND AREA[PrimaryCompletionDate]RANGE[{completion_min},{completion_max}]",
         "pageSize": page_size,
         "format": "json",
         "sort": "PrimaryCompletionDate:asc",
