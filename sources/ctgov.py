@@ -63,6 +63,7 @@ def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: in
             overall = _safe_get(ps, ["statusModule", "overallStatus"])
             last_update = _safe_get(ps, ["statusModule", "lastUpdatePostDateStruct", "date"])
             primary_completion = _safe_get(ps, ["statusModule", "primaryCompletionDateStruct", "date"])
+            start_date = _safe_get(ps, ["statusModule", "startDateStruct", "date"])
 
             event_id = _hash_id("ctgov", nct, primary_completion)
 
@@ -74,9 +75,8 @@ def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: in
                 "asset_name": asset_name,
                 "company": sponsor,
                 "indication_raw": ", ".join(conds),
-                "phase": "3",
-                "trial_id": nct,
-                "start_date": _safe_get(ps, ["statusModule", "startDateStruct", "date"]),
+                "id": nct,
+                "start_date": start_date,
                 "last_update": last_update,
                 "geography": geography,
                 "source_url": f"https://clinicaltrials.gov/study/{nct}",

@@ -55,6 +55,7 @@ def fetch_ctis_phase3(page_size: int = 200, max_pages: int = 10):
             sponsor = (t.get("sponsor") or "").strip()
             condition = (t.get("conditions") or "").strip()
             last_updated = (t.get("lastUpdated") or "").strip()
+            decision_date = (t.get("decisionDateOverall") or "").strip()
 
             if not ct_number:
                 continue
@@ -69,17 +70,17 @@ def fetch_ctis_phase3(page_size: int = 200, max_pages: int = 10):
                 "asset_name": "",
                 "company": sponsor,
                 "indication_raw": condition,
-                "phase": "3",
-                "trial_id": ct_number,
-                "start_date": "",
+                "id": ct_number,
+                "start_date": decision_date,
                 "last_update": last_updated,
                 "geography": "EU",
-                "source_url": f"https://euclinicaltrials.eu/ctis-public/search/{ct_number}",
+                "source_url": f"https://euclinicaltrials.eu/ctis-public/view/{ct_number}",
                 "title": title,
-                "summary": f"trialPhase={t.get('trialPhase','')}; decisionDate={t.get('decisionDateOverall','')}",
+                "summary": f"trialPhase={t.get('trialPhase','')}; decisionDate={decision_date}",
             })
 
         next_page = data.get("pagination", {}).get("nextPage", False)
         page += 1
 
+    print(f"CTIS fetched: {len(events)}")
     return events

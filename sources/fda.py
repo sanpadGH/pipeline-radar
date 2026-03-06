@@ -4,11 +4,10 @@ import requests
 import zipfile
 import io
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 FDA_DOWNLOAD_URL = "https://api.fda.gov/download.json"
 
-# BLA numbers de biosimilares conocidos — actualizar periódicamente
 BIOSIMILAR_BLA = {
     "BLA761377", "BLA761398", "BLA761399", "BLA761188", "BLA761340",
     "BLA761433", "BLA761444", "BLA761424", "BLA761420", "BLA761498",
@@ -16,7 +15,6 @@ BIOSIMILAR_BLA = {
     "BLA761425", "BLA761373", "BLA761392", "BLA761436", "BLA761404",
     "BLA761379", "BLA761212", "BLA761325", "BLA761175", "BLA761027",
     "BLA761456", "BLA761457", "BLA761473", "BLA761258",
-    # Added round 2
     "BLA761432", "BLA761400", "BLA761428", "BLA761450",
 }
 
@@ -65,7 +63,6 @@ def fetch_fda_approvals():
                     if appl_type not in ("NDA", "BLA"):
                         continue
 
-                    # Excluir biosimilares conocidos
                     if app_no in BIOSIMILAR_BLA:
                         continue
 
@@ -112,8 +109,7 @@ def fetch_fda_approvals():
                         "asset_name": generic_name or brand_name,
                         "company": sponsor,
                         "indication_raw": "",
-                        "phase": "",
-                        "trial_id": app_no,
+                        "id": app_no,
                         "start_date": "",
                         "last_update": action_date,
                         "geography": "US",
@@ -162,8 +158,7 @@ def fetch_fda_adcom():
                 "asset_name": "",
                 "company": "",
                 "indication_raw": "",
-                "phase": "",
-                "trial_id": "",
+                "id": "",
                 "start_date": pub_date,
                 "last_update": pub_date,
                 "geography": "US",

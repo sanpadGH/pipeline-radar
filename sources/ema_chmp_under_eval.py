@@ -41,6 +41,10 @@ def fetch_ema_under_review_chmp():
 
         event_id = _hash_id("ema_chmp_under_eval", ema_no or inn)
 
+        # Build product URL from EMA product number
+        ema_no_clean = ema_no.replace("EMEA/H/C/", "").lstrip("0") if ema_no else ""
+        product_url = f"https://www.ema.europa.eu/en/medicines/human/EPAR/{inn.lower().replace(' ', '-')}" if inn else xlsx_url
+
         events.append({
             "event_id": event_id,
             "date_detected": now.isoformat(),
@@ -49,12 +53,11 @@ def fetch_ema_under_review_chmp():
             "asset_name": inn,
             "company": "",
             "indication_raw": indication,
-            "phase": "",
-            "trial_id": ema_no,
+            "id": ema_no,
             "start_date": str(start_eval) if start_eval is not None else "",
             "last_update": "",
             "geography": "EU",
-            "source_url": xlsx_url,
+            "source_url": product_url,
             "title": inn,
             "summary": f"EMA Prod: {ema_no}; Start eval: {start_eval}; Type: {substance_type}; PRIME: {is_prime}; Orphan: {orphan}",
         })

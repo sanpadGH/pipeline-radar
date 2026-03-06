@@ -10,7 +10,7 @@ SCOPES = [
 
 COLUMNS = [
     "event_id","date_detected","source","signal_type","asset_name","company",
-    "indication_raw","phase","trial_id","start_date","last_update",
+    "indication_raw","id","start_date","last_update",
     "geography","source_url","title","summary"
 ]
 
@@ -20,29 +20,30 @@ def _client():
         scopes=SCOPES
     )
     return gspread.authorize(creds)
+
 def upsert_events(spreadsheet_id, worksheet_name, events):
     gc = _client()
     ws = gc.open_by_key(spreadsheet_id).worksheet(worksheet_name)
-    
+
     ws.update("A1", [COLUMNS])
     print("Header written:", COLUMNS)
-    
+
     existing = ws.get_all_records(expected_headers=COLUMNS)
     print("Existing rows:", len(existing))
-    
+
     existing_ids = {r["event_id"] for r in existing if r.get("event_id")}
-    existing_trial_ids = {r["trial_id"] for r in existing if r.get("trial_id")}
+    existing_trial_ids = {r["id"] for r in existing if r.get("id")}
 
     new_rows = []
     for e in events:
-        if e.get("trial_id") in existing_trial_ids:
+        if e.get("id") in existing_trial_ids:
             continue
         if e["event_id"] in existing_ids:
             continue
         new_rows.append([e.get(col, "") for col in COLUMNS])
 
     print("New rows to insert:", len(new_rows))
-    
+
     if new_rows:
         ws.append_rows(new_rows, value_input_option="RAW")
 
