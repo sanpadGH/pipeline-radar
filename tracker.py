@@ -10,6 +10,7 @@ from sinks.sheets import (
     load_ema_company_map, save_ema_company_map
 )
 
+
 def main():
     spreadsheet_id = os.environ["SPREADSHEET_ID"]
     worksheet = os.environ.get("WORKSHEET_NAME", "events")
@@ -46,9 +47,6 @@ def main():
     inserted = upsert_events(spreadsheet_id, worksheet, all_events)
     print("Inserted rows:", inserted)
 
-if __name__ == "__main__":
-    main()    inserted = upsert_events(spreadsheet_id, worksheet, all_events)
-    print("Inserted rows:", inserted)
 
 if __name__ == "__main__":
     main()
