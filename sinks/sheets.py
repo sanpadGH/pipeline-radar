@@ -14,12 +14,39 @@ COLUMNS = [
     "geography","source_url","title","summary"
 ]
 
+CACHE_COLUMNS = ["ct_number", "asset_name", "start_date"]
+
 def _client():
     creds = Credentials.from_service_account_info(
         json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"]),
         scopes=SCOPES
     )
     return gspread.authorize(creds)
+
+def get_or_create_worksheet(spreadsheet, name, headers):
+    try:
+        ws = spreadsheet.worksheet(name)
+    except gspread.exceptions.WorksheetNotFound:
+        ws = spreadsheet.add_worksheet(title=name, rows=2000, cols=len(headers))
+        ws.update("A1", [headers])
+    return ws
+
+def load_ctis_cache(spreadsheet_id):
+    gc = _client()
+    ss = gc.open_by_key(spreadsheet_id)
+    ws = get_or_create_worksheet(ss, "ctis_cache", CACHE_COLUMNS)
+    rows = ws.get_all_records(expected_headers=CACHE_COLUMNS)
+    return {r["ct_number"]: {"asset_name": r["asset_name"], "start_date": r["start_date"]} for r in rows if r.get("ct_number")}
+
+def save_ctis_cache(spreadsheet_id, cache_updates):
+    if not cache_updates:
+        return
+    gc = _client()
+    ss = gc.open_by_key(spreadsheet_id)
+    ws = get_or_create_worksheet(ss, "ctis_cache", CACHE_COLUMNS)
+    rows = [[ct, v["asset_name"], v["start_date"]] for ct, v in cache_updates.items()]
+    ws.append_rows(rows, value_input_option="RAW")
+    print(f"CTIS cache updated: {len(rows)} new entries")
 
 def upsert_events(spreadsheet_id, worksheet_name, events):
     gc = _client()
