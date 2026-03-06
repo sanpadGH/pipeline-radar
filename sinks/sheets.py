@@ -70,26 +70,14 @@ def upsert_events(spreadsheet_id, worksheet_name, events):
     gc = _client()
     ws = gc.open_by_key(spreadsheet_id).worksheet(worksheet_name)
 
-    ws.update("A1", [COLUMNS])
-    print("Header written:", COLUMNS)
+    # Clear all existing data and rewrite from scratch
+    ws.clear()
 
-    existing = ws.get_all_records(expected_headers=COLUMNS)
-    print("Existing rows:", len(existing))
-
-    existing_ids = {r["event_id"] for r in existing if r.get("event_id")}
-    existing_trial_ids = {r["id"] for r in existing if r.get("id")}
-
-    new_rows = []
+    rows = [COLUMNS]
     for e in events:
-        if e.get("id") in existing_trial_ids:
-            continue
-        if e["event_id"] in existing_ids:
-            continue
-        new_rows.append([e.get(col, "") for col in COLUMNS])
+        rows.append([e.get(col, "") for col in COLUMNS])
 
-    print("New rows to insert:", len(new_rows))
+    ws.update("A1", rows)
 
-    if new_rows:
-        ws.append_rows(new_rows, value_input_option="RAW")
-
-    return len(new_rows)
+    print(f"Events written: {len(events)}")
+    return len(events)
