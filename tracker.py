@@ -1,10 +1,14 @@
 import os
 from sources.ctgov import fetch_phase3_recent
 from sources.ema_chmp_under_eval import fetch_ema_under_review_chmp
+from sources.ema_company import enrich_ema_companies
 from sources.ctis import fetch_ctis_phase3, enrich_ctis_trials
 from sources.fda import fetch_fda_under_review
 from sources.ema_approvals import fetch_ema_approvals
-from sinks.sheets import upsert_events, load_ctis_cache, save_ctis_cache
+from sinks.sheets import (
+    upsert_events, load_ctis_cache, save_ctis_cache,
+    load_ema_company_map, save_ema_company_map
+)
 
 def main():
     spreadsheet_id = os.environ["SPREADSHEET_ID"]
@@ -19,12 +23,17 @@ def main():
     ema_events = fetch_ema_under_review_chmp()
     print("EMA CHMP under evaluation fetched:", len(ema_events))
 
+    print("Loading EMA company map...")
+    company_map = load_ema_company_map(spreadsheet_id)
+    print(f"EMA company map loaded: {len(company_map)} entries")
+    ema_events, new_company_entries = enrich_ema_companies(ema_events, company_map)
+    save_ema_company_map(spreadsheet_id, new_company_entries)
+
     ctis_events = fetch_ctis_phase3()
 
     print("Loading CTIS cache...")
     ctis_cache = load_ctis_cache(spreadsheet_id)
     print(f"CTIS cache loaded: {len(ctis_cache)} entries")
-
     ctis_events, new_cache = enrich_ctis_trials(ctis_events, ctis_cache)
     save_ctis_cache(spreadsheet_id, new_cache)
 
@@ -35,6 +44,10 @@ def main():
     all_events = ema_events + ema_approval_events + fda_events + ctis_events + ctgov_events
 
     inserted = upsert_events(spreadsheet_id, worksheet, all_events)
+    print("Inserted rows:", inserted)
+
+if __name__ == "__main__":
+    main()    inserted = upsert_events(spreadsheet_id, worksheet, all_events)
     print("Inserted rows:", inserted)
 
 if __name__ == "__main__":
