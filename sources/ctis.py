@@ -73,8 +73,9 @@ def _extract_active_substance(detail, sponsor: str = "") -> tuple[str, str]:
         substances = chosen.get("productDictionaryInfo", {}).get("productSubstances", [])
         for s in substances:
             for syn in (s.get("synonyms") or []):
-                if syn.strip() and syn.strip() not in aliases:
-                    aliases.append(syn.strip())
+                syn = syn.strip()
+                if syn and len(syn) <= 30 and syn not in aliases:
+                    aliases.append(syn)
 
         # Add sponsor product code if present
         sponsor_code = (chosen.get("sponsorProductCodeEdit") or "").strip()
