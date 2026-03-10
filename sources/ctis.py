@@ -10,24 +10,88 @@ RETRIEVE_URL = "https://euclinicaltrials.eu/ctis-public-api/retrieve"
 def _hash_id(*parts):
     return hashlib.sha256("||".join([p or "" for p in parts]).encode("utf-8")).hexdigest()[:20]
 
-def _extract_active_substance(detail):
+def _sponsor_words(sponsor: str) -> set:
+    """Extract meaningful words from sponsor name for fuzzy matching."""
+    stopwords = {"inc", "ltd", "llc", "gmbh", "bv", "sa", "ag", "co", "corp",
+                 "the", "and", "of", "for", "global", "development", "pharma",
+                 "pharmaceuticals", "biosciences", "therapeutics", "oncology"}
+    words = set()
+    for w in sponsor.lower().replace(".", " ").replace(",", " ").replace("-", " ").split():
+        if w not in stopwords and len(w) > 2:
+            words.add(w)
+    return words
+
+def _extract_active_substance(detail, sponsor: str = "") -> tuple[str, str]:
+    """
+    Returns (asset_name, aliases).
+
+    Strategy:
+    1. Filter products with part1MpRoleTypeCode == "1" (investigational)
+    2. Among those, prefer the one whose nameOrg matches the sponsor
+    3. Fallback: first product with part1MpRoleTypeCode == "1"
+    4. aliases = synonyms + brand name (prodName) if available
+    """
     try:
         products = (
             detail.get("authorizedApplication", {})
             .get("authorizedPartI", {})
             .get("products", [])
         )
-        for p in products:
-            if p.get("mpRoleInTrial") == "1":
-                name = (
-                    p.get("productDictionaryInfo", {})
-                    .get("activeSubstanceName", "")
-                )
-                if name and name.upper() != "N/A":
-                    return name.strip()
+
+        investigational = [
+            p for p in products
+            if str(p.get("part1MpRoleTypeCode", "")).strip() == "1"
+        ]
+
+        if not investigational:
+            return "", ""
+
+        # Try to match sponsor
+        chosen = None
+        if sponsor:
+            sponsor_words = _sponsor_words(sponsor)
+            for p in investigational:
+                name_org = p.get("productDictionaryInfo", {}).get("nameOrg", "").lower()
+                if any(w in name_org for w in sponsor_words):
+                    chosen = p
+                    break
+
+        if not chosen:
+            chosen = investigational[0]
+
+        # asset_name
+        asset_name = (
+            chosen.get("productDictionaryInfo", {})
+            .get("activeSubstanceName", "")
+            .strip()
+        )
+        if not asset_name or asset_name.upper() == "N/A":
+            return "", ""
+
+        # aliases: synonyms + brand name
+        aliases = []
+        substances = chosen.get("productDictionaryInfo", {}).get("productSubstances", [])
+        for s in substances:
+            for syn in (s.get("synonyms") or []):
+                if syn.strip() and syn.strip() not in aliases:
+                    aliases.append(syn.strip())
+
+        # Add sponsor product code if present
+        sponsor_code = (chosen.get("sponsorProductCodeEdit") or "").strip()
+        if sponsor_code and sponsor_code not in aliases:
+            aliases.append(sponsor_code)
+
+        # Add brand name (prodName) — strip dosage info after first comma
+        prod_name = chosen.get("productDictionaryInfo", {}).get("prodName", "").strip()
+        if prod_name:
+            brand = prod_name.split(" ")[0].strip()  # first word is usually the brand
+            if brand and brand.upper() != asset_name.upper() and brand not in aliases:
+                aliases.append(brand)
+
+        return asset_name, "; ".join(aliases)
+
     except Exception:
-        pass
-    return ""
+        return "", ""
 
 def _extract_start_date(detail):
     try:
@@ -44,6 +108,7 @@ def enrich_ctis_trials(trials, cache):
 
         if ct_number in cache:
             t["asset_name"] = cache[ct_number]["asset_name"]
+            t["aliases"] = cache[ct_number].get("aliases", "")
             t["start_date"] = cache[ct_number]["start_date"]
             enriched.append(t)
             continue
@@ -52,16 +117,18 @@ def enrich_ctis_trials(trials, cache):
             r = requests.get(f"{RETRIEVE_URL}/{ct_number}", timeout=30)
             r.raise_for_status()
             detail = r.json()
-            asset = _extract_active_substance(detail)
+            asset, aliases = _extract_active_substance(detail, sponsor=t.get("company", ""))
             start = _extract_start_date(detail)
         except Exception as ex:
             print(f"Warning: could not retrieve CTIS {ct_number}: {ex}")
             asset = ""
+            aliases = ""
             start = ""
 
         t["asset_name"] = asset
+        t["aliases"] = aliases
         t["start_date"] = start
-        new_cache[ct_number] = {"asset_name": asset, "start_date": start}
+        new_cache[ct_number] = {"asset_name": asset, "aliases": aliases, "start_date": start}
         enriched.append(t)
         time.sleep(0.5)
 
@@ -128,6 +195,7 @@ def fetch_ctis_phase3(page_size: int = 200, max_pages: int = 10):
                 "source": "ctis",
                 "signal_type": "phase3_trial",
                 "asset_name": "",
+                "aliases": "",
                 "company": sponsor,
                 "indication_raw": condition,
                 "id": ct_number,
