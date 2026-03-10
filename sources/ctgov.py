@@ -55,7 +55,7 @@ def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: in
             sponsor = _safe_get(ps, ["sponsorCollaboratorsModule", "leadSponsor", "name"])
             conds = _safe_get(ps, ["conditionsModule", "conditions"], default=[]) or []
             interventions = _safe_get(ps, ["armsInterventionsModule", "interventions"], default=[]) or []
-            asset = next((i for i in interventions if i.get("type") == "DRUG"), {})
+            asset = next((i for i in interventions if i.get("type") in ("DRUG", "BIOLOGICAL")), {})
             asset_name = asset.get("name", "").strip()
             aliases = "; ".join(asset.get("otherNames") or [])
             locations = _safe_get(ps, ["contactsLocationsModule", "locations"], default=[]) or []
