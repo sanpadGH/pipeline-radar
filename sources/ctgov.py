@@ -55,8 +55,9 @@ def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: in
             sponsor = _safe_get(ps, ["sponsorCollaboratorsModule", "leadSponsor", "name"])
             conds = _safe_get(ps, ["conditionsModule", "conditions"], default=[]) or []
             interventions = _safe_get(ps, ["armsInterventionsModule", "interventions"], default=[]) or []
-            drug_interventions = [i for i in interventions if i.get("type") in ("DRUG", "BIOLOGICAL")]
-            asset_name = drug_interventions[0].get("name", "") if drug_interventions else ""
+            asset = next((i for i in interventions if i.get("type") == "DRUG"), {})
+            asset_name = asset.get("name", "").strip()
+            aliases = "; ".join(asset.get("otherNames") or [])
             locations = _safe_get(ps, ["contactsLocationsModule", "locations"], default=[]) or []
             countries = list({loc.get("country", "") for loc in locations if loc.get("country")})
             geography = ", ".join(sorted(countries)) if countries else ""
@@ -73,6 +74,7 @@ def fetch_phase3_recent(days_back: int = 90, page_size: int = 100, max_pages: in
                 "source": "ctgov",
                 "signal_type": "phase3_trial",
                 "asset_name": asset_name,
+                "aliases": aliases,
                 "company": sponsor,
                 "indication_raw": ", ".join(conds),
                 "id": nct,
