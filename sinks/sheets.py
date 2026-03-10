@@ -9,9 +9,9 @@ SCOPES = [
 ]
 
 COLUMNS = [
-    "event_id","date_detected","source","signal_type","asset_name","company",
-    "indication_raw","id","start_date","last_update",
-    "geography","source_url","title","summary"
+    "event_id", "date_detected", "source", "signal_type", "asset_name", "aliases", "company",
+    "indication_raw", "id", "start_date", "last_update",
+    "geography", "source_url", "title", "summary"
 ]
 
 CACHE_COLUMNS = ["ct_number", "asset_name", "start_date"]
@@ -69,15 +69,10 @@ def save_ema_company_map(spreadsheet_id, new_entries):
 def upsert_events(spreadsheet_id, worksheet_name, events):
     gc = _client()
     ws = gc.open_by_key(spreadsheet_id).worksheet(worksheet_name)
-
-    # Clear all existing data and rewrite from scratch
     ws.clear()
-
     rows = [COLUMNS]
     for e in events:
         rows.append([e.get(col, "") for col in COLUMNS])
-
     ws.update("A1", rows)
-
     print(f"Events written: {len(events)}")
     return len(events)
